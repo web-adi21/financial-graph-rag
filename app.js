@@ -9,6 +9,31 @@ const redisClient = createClient({
 
 redisClient.on('error', (err) => console.log('Redis Client Error', err));
 
+const slidingWindowScript = `
+    local key = KEYS[1]
+    local now = tonumber(ARGV[1])
+    local window = tonumber(ARGV[2])
+    local limit = tonumber(ARGV[3])
+    local clearBefore = now - window
+
+    -- Remove timestamps older than 60 seconds
+    redis.call('ZREMRANGEBYSCORE', key, 0, clearBefore)
+    
+    -- Count how many requests are left in the window
+    local count = redis.call('ZCARD', key)
+
+    if count < limit then
+        -- Under the limit! Add the current timestamp and let them in
+        redis.call('ZADD', key, now, now)
+        -- Set an expiration so old data clears out of memory
+        redis.call('EXPIRE', key, window / 1000)
+        return 1
+    else
+        -- Over the limit! Block them
+        return 0
+    end
+`
+
 async function startServer() {
 
   await redisClient.connect();
