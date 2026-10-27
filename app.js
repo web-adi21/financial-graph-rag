@@ -1,11 +1,17 @@
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']);
+
 const express = require("express");
 const app = express();
 const {createClient} = require("redis");
 const PORT = 3000;
+const {MongoClient} = require("mongodb");
 
 const redisClient = createClient({
     url: "redis://default:YLzwo1NvUiDTngdpwE9iqarSdZPKxJ74@haircut-quill-pin-15285.db.redis.io:13836"
 });
+const mongoUri = "mongodb+srv://ce4052025_db_user:a2fnRRp0lIG4GXd6@graphrag.ly0yyez.mongodb.net/";
+const mongoClient = new MongoClient(mongoUri);
 
 redisClient.on('error', (err) => console.log('Redis Client Error', err));
 
@@ -67,6 +73,9 @@ async function startServer() {
   await redisClient.connect();
   console.log("Connected to Redis Cloud successfully!");
 
+  await mongoClient.connect();
+  console.log("successfully connected to MongoDB clusster");
+  
   app.get("/api/data" , rateLimiter,(req,res) => {
   res.json({message: "Un-throttled endpoint running"});
 });
