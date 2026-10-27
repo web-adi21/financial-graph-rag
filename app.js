@@ -16,34 +16,60 @@ const slidingWindowScript = `
     local limit = tonumber(ARGV[3])
     local clearBefore = now - window
 
-    -- Remove timestamps older than 60 seconds
     redis.call('ZREMRANGEBYSCORE', key, 0, clearBefore)
     
-    -- Count how many requests are left in the window
     local count = redis.call('ZCARD', key)
 
     if count < limit then
-        -- Under the limit! Add the current timestamp and let them in
+         
         redis.call('ZADD', key, now, now)
-        -- Set an expiration so old data clears out of memory
+  
         redis.call('EXPIRE', key, window / 1000)
         return 1
     else
-        -- Over the limit! Block them
+     
         return 0
     end
 `
+
+async function rateLimiter(req,res,next) {
+  const uuserIp = req.ip;
+  const now = Date.now();
+  const windowMs = 60000;
+  const limit = 5;
+
+  try {
+    const result = await redisClient.sendCommand([
+      'EVAL',
+      slidingWindowScript,
+      '1',
+      uuserIp,
+      now.toString(),
+      windowMs.toString(),
+      limit.toString()
+    ]);
+
+    if(result === 1){
+      next();
+    } else {
+      res.status(429).json({error: "Too many requests . Please wait a minute"});
+    }
+  } catch (error) {
+      console.error("Rate limiter Error: " , error);
+      res.status(500).json({error : "Internal Server Error"})
+  }
+  
+  
+}
 
 async function startServer() {
 
   await redisClient.connect();
   console.log("Connected to Redis Cloud successfully!");
 
-  app.get("/api/data",(req,res) => {
+  app.get("/api/data" , rateLimiter,(req,res) => {
   res.json({message: "Un-throttled endpoint running"});
 });
-
-
 
 app.listen(PORT, () => {
   console.log(`Server is listening on port ${PORT}`);
