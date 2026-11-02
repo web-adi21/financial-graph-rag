@@ -1,3 +1,6 @@
+const dns = require('dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']);
+
 const {OllamaEmbeddings} = require("@langchain/ollama");
 const {MongoDBAtlasVectorSearch} = require("@langchain/mongodb");
 const {MongoClient} = require("mongodb");
@@ -21,18 +24,32 @@ async function runQuery() {
       textKey:"text",
       embeddingKey:"embedding",
     });
-
+    
     const question = "What are the primary financial risks or uncertainties mentioned?";
-    const result = await vectorStore.similaritySearch(question,2);
+    const results = await vectorStore.similaritySearch(question,2);
 
-    console.log("--- TOP MATCH 1 ---");
+       
+        if (results.length === 0) {
+            console.log("\nZero matches returned. The database index is likely still building, or the index name doesn't match exactly.");
+            return;
+        }
+
+        console.log("--- TOP MATCH 1 ---");
         console.log(results[0].pageContent);
-        console.log("\n--- TOP MATCH 2 ---");
-        console.log(results[1].pageContent);
-  } catch (error) {
-    console.log("Query Error: ", error);
-  } finally{
-    await client.close();
-  }
-  
+        
+        if (results[1]) {
+            console.log("\n--- TOP MATCH 2 ---");
+            console.log(results[1].pageContent);
+        }
+
+    } catch (error) {
+        console.error("Query Error:", error);
+    } finally {
+        await client.close();
+    }
 }
+   
+  
+
+
+runQuery();
